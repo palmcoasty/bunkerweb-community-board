@@ -944,12 +944,12 @@ textarea.form-input { resize: vertical; min-height: 85px; }
         <div class="page-title">Issues</div>
         <input class="filter-input" style="margin-left:auto" placeholder="Filter by repo…" oninput="filterIssueRepo(this.value)">
       </div>
-      <div class="page-subtitle">Issues involving you across all repos</div>
+      <div class="page-subtitle" id="issuesSubtitle">Loading…</div>
       <div class="filter-bar">
         <button class="filter-btn active" onclick="filterIssueState('open',this)">Open</button>
         <button class="filter-btn" onclick="filterIssueState('closed',this)">Closed</button>
       </div>
-      <div class="card"><div id="globalIssuesTable"><div class="bw-empty"><span class="bw-empty-icon">🔒</span><p>Sign in to view issues</p></div></div></div>
+      <div class="card"><div id="globalIssuesTable"><div class="loading-wrap"><div class="spinner"></div>Loading…</div></div></div>
     </div>
 
     <!-- PULL REQUESTS -->
@@ -958,13 +958,13 @@ textarea.form-input { resize: vertical; min-height: 85px; }
         <div class="page-title">Pull Requests</div>
         <input class="filter-input" style="margin-left:auto" placeholder="Filter by repo…" oninput="filterPrRepo(this.value)">
       </div>
-      <div class="page-subtitle">Pull requests involving you</div>
+      <div class="page-subtitle" id="prsSubtitle">Loading…</div>
       <div class="filter-bar">
         <button class="filter-btn active" onclick="filterPrState('open',this)">Open</button>
         <button class="filter-btn" onclick="filterPrState('closed',this)">Closed</button>
         <button class="filter-btn" onclick="filterPrState('merged',this)">Merged</button>
       </div>
-      <div class="card"><div id="globalPRsTable"><div class="bw-empty"><span class="bw-empty-icon">🔒</span><p>Sign in to view pull requests</p></div></div></div>
+      <div class="card"><div id="globalPRsTable"><div class="loading-wrap"><div class="spinner"></div>Loading…</div></div></div>
     </div>
 
     <!-- COMMUNITY -->
@@ -979,15 +979,8 @@ textarea.form-input { resize: vertical; min-height: 85px; }
           <option value="issues">🐛 Most Issues</option>
         </select>
       </div>
-      <div class="page-subtitle">BunkerWeb and related open-source security projects — <strong style="color:var(--green)">no login needed</strong></div>
+      <div class="page-subtitle">BunkerWeb and related open-source projects — <strong style="color:var(--green)">no login needed</strong></div>
       <div id="communitySpotlight"></div>
-      <div class="filter-bar" id="communityFilters">
-        <button class="filter-btn active" onclick="filterCommunityTopic('all',this)">All</button>
-        <button class="filter-btn" onclick="filterCommunityTopic('waf',this)">WAF</button>
-        <button class="filter-btn" onclick="filterCommunityTopic('security',this)">Security</button>
-        <button class="filter-btn" onclick="filterCommunityTopic('nginx',this)">Nginx</button>
-        <button class="filter-btn" onclick="filterCommunityTopic('docker',this)">Docker</button>
-      </div>
       <div id="communityGrid" class="community-grid">
         <div class="loading-wrap"><div class="spinner"></div>Loading…</div>
       </div>
@@ -1008,9 +1001,23 @@ textarea.form-input { resize: vertical; min-height: 85px; }
       <div class="lm-title">BunkerWeb Dashboard</div>
       <div class="lm-subtitle">
         Sign in to create issues, review PRs, and merge code.<br>
-        <span style="color:var(--green);font-weight:700">Login is optional</span> — Community &amp; public data visible without it.
+        <span style="color:var(--green);font-weight:700">Login is optional</span> — issues &amp; PRs are visible without it.
       </div>
       <input class="form-input" id="clientIdInput" placeholder="Your GitHub OAuth client_id">
+      <details style="text-align:left;margin:10px 0 6px;font-size:12px">
+        <summary style="cursor:pointer;color:var(--txt2);user-select:none;padding:4px 0">How to get a Client ID ▸</summary>
+        <div style="padding:10px 0 4px">
+          <ol style="padding-left:18px;color:var(--txt2);line-height:2.1;margin:0">
+            <li>Go to <a href="https://github.com/settings/applications/new" target="_blank" style="color:var(--green)">GitHub → Settings → Developer settings → OAuth Apps</a></li>
+            <li>Click <b style="color:var(--txt)">New OAuth App</b></li>
+            <li>Set <b style="color:var(--txt)">Homepage URL</b> and <b style="color:var(--txt)">Authorization callback URL</b> to this page's URL</li>
+            <li>Click <b style="color:var(--txt)">Register application</b></li>
+            <li>Copy the <b style="color:var(--txt)">Client ID</b> (starts with <code style="color:var(--green);font-family:'JetBrains Mono',monospace">Iv1.</code>)</li>
+            <li>Paste it in the field above and click Sign in</li>
+          </ol>
+          <div style="color:var(--txt3);margin-top:6px;font-size:11px">Device Flow OAuth · No client secret needed · No backend required</div>
+        </div>
+      </details>
       <div class="device-code-box" id="deviceCodeBox">
         <div style="font-size:12px;color:var(--txt2);margin-bottom:9px">Enter this code at GitHub:</div>
         <div class="device-code" id="deviceCode">—</div>
@@ -1153,7 +1160,7 @@ async function gh(path, options={}){
   const res = await fetch(BASE+path, {
     ...options,
     headers:{
-      Authorization:`Bearer ${STATE.token}`,
+      ...(STATE.token?{Authorization:`Bearer ${STATE.token}`}:{}),
       Accept:'application/vnd.github+json',
       'X-GitHub-Api-Version':'2022-11-28',
       ...(options.body?{'Content-Type':'application/json'}:{}),
@@ -1182,6 +1189,16 @@ function updateRate(rem, lim){
   const dot = document.getElementById('rateDot');
   dot.style.background = pct>50?'var(--bw-green)':pct>20?'var(--bw-orange)':'var(--bw-red)';
   document.getElementById('rateText').textContent = `API: ${rem}/${lim} left`;
+}
+
+// ════════════════════════════════════════════
+// WRITE-ACTION GUARD
+// ════════════════════════════════════════════
+function requireAuth(action='do this'){
+  if(STATE.token) return true;
+  toast('Sign in to ' + action, 'info');
+  openModal('loginModal');
+  return false;
 }
 
 // ════════════════════════════════════════════
@@ -1245,39 +1262,41 @@ function pollForToken(device_code, client_id, interval){
 
 function logout(){
   localStorage.removeItem('gh_token');
-  STATE.token=''; STATE.user=null;
-  document.getElementById('app').style.display='none';
-  document.getElementById('login-screen').style.display='flex';
+  STATE.token=''; STATE.user=null; STATE.repos=[];
+  document.getElementById('headerAuth').innerHTML=`<button class="btn-signin" onclick="openModal('loginModal')">Sign in</button>`;
+  document.getElementById('sidebarAuth').innerHTML=`<div class="auth-notice" onclick="openModal('loginModal')">🔑 Sign in for write access</div>`;
   document.getElementById('loginBtn').style.display='';
   document.getElementById('loginBtn').disabled=false;
   document.getElementById('loginBtn').textContent='🔑  Sign in with GitHub';
   document.getElementById('deviceCodeBox').style.display='none';
   document.getElementById('pollSpinner').style.display='none';
+  // Reload public data
+  loadGlobalIssues();
+  loadGlobalPRs();
 }
 
 // ════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════
 async function initApp(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='flex';
-
   try { await loadUser(); } catch(e){ toast('Could not load user: '+e.message,'error'); return; }
+  closeModal('loginModal');
   loadAllData();
 }
 
 async function loadUser(){
   STATE.user = await api.get('/user');
-  document.getElementById('userAvatar').src = STATE.user.avatar_url;
-  document.getElementById('userName').textContent = STATE.user.login;
+  document.getElementById('headerAuth').innerHTML = `
+    <img src="${esc(STATE.user.avatar_url)}" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--border2)">
+    <span style="font-size:13px;font-weight:700;color:var(--txt);margin:0 4px">${esc(STATE.user.login)}</span>
+    <button class="btn-sm ghost" onclick="logout()">Sign out</button>`;
+  document.getElementById('sidebarAuth').innerHTML = '';
 }
 
 async function loadAllData(){
   await loadRepos();
   loadGlobalIssues();
   loadGlobalPRs();
-  loadBWSpotlight();
-  loadCommunity();
   updateDashboard();
 }
 
@@ -1295,10 +1314,16 @@ async function loadRepos(){
 
 async function loadGlobalIssues(){
   try{
-    const issues = await api.get(`/issues?state=${STATE.issueState}&per_page=50&filter=all`);
+    let issues;
+    if(STATE.token){
+      issues = await api.get(`/issues?state=${STATE.issueState}&per_page=50&filter=all`);
+      document.getElementById('statIssues').textContent = issues.length;
+    } else {
+      const raw = await gh(`/repos/bunkerity/bunkerweb/issues?state=${STATE.issueState}&per_page=50`);
+      issues = raw.filter(i=>!i.pull_request);
+    }
     STATE.issues = issues;
     document.getElementById('navIssueBadge').textContent = issues.length;
-    document.getElementById('statIssues').textContent = issues.length;
     renderGlobalIssues();
     renderDashIssues();
   }catch(e){ toast('Issues: '+e.message,'error'); }
@@ -1306,10 +1331,18 @@ async function loadGlobalIssues(){
 
 async function loadGlobalPRs(){
   try{
-    const prs = await api.get(`/search/issues?q=is:pr+is:${STATE.prState}+involves:${STATE.user.login}&per_page=30`);
-    STATE.prs = prs.items||[];
-    document.getElementById('navPrBadge').textContent = STATE.prs.length;
-    document.getElementById('statPRs').textContent = STATE.prs.length;
+    let prs;
+    if(STATE.token){
+      const res = await api.get(`/search/issues?q=is:pr+is:${STATE.prState}+involves:${STATE.user.login}&per_page=30`);
+      prs = res.items||[];
+      document.getElementById('statPRs').textContent = prs.length;
+    } else {
+      const apiState = STATE.prState==='merged'?'closed':STATE.prState;
+      const raw = await gh(`/repos/bunkerity/bunkerweb/pulls?state=${apiState}&per_page=30`);
+      prs = STATE.prState==='merged' ? raw.filter(p=>p.merged_at) : raw;
+    }
+    STATE.prs = prs;
+    document.getElementById('navPrBadge').textContent = prs.length;
     renderGlobalPRs();
     renderDashPRs();
   }catch(e){ toast('PRs: '+e.message,'error'); }
@@ -1388,70 +1421,36 @@ async function loadBWSpotlight(){
 // ════════════════════════════════════════════
 // COMMUNITY
 // ════════════════════════════════════════════
+// ── Edit this list to control which repos appear in the Community tab.
+// Each entry maps to https://github.com/{owner}/{repo}
 const COMMUNITY_REPOS = [
-  'bunkerity/bunkerweb',
-  'nicholaswilde/helm-charts',
-  'nginx/nginx',
-  'modsecurity/ModSecurity',
-  'fail2ban/fail2ban',
-  'certbot/certbot',
-  'OWASP/www-project-top-ten',
-  'nicowillis/awesome-security',
-  'crowdsecurity/crowdsec',
-  'getsentry/sentry',
-  'traefik/traefik',
-  'nicowillis/nginx-proxy',
-  'nicowillis/awesome-nginx',
+  { owner: 'bunkerity',     repo: 'bunkerweb',  url: 'https://github.com/bunkerity/bunkerweb' },
+  { owner: 'crowdsecurity',  repo: 'crowdsec',   url: 'https://github.com/crowdsecurity/crowdsec' },
+  { owner: 'traefik',       repo: 'traefik',    url: 'https://github.com/traefik/traefik' },
+  { owner: 'certbot',       repo: 'certbot',    url: 'https://github.com/certbot/certbot' },
+  { owner: 'fail2ban',      repo: 'fail2ban',   url: 'https://github.com/fail2ban/fail2ban' },
+  { owner: 'nicholaswilde', repo: 'helm-charts', url: 'https://github.com/nicholaswilde/helm-charts' },
+  { owner: 'getsentry',     repo: 'sentry',     url: 'https://github.com/getsentry/sentry' },
 ];
 
-// We'll use GitHub search to find security/waf related popular repos
 async function loadCommunity(){
-  document.getElementById('communityGrid').innerHTML=`<div class="loading-spinner"><div class="spinner"></div>Loading community repos…</div>`;
-  try{
-    // Search for popular security / WAF / nginx / docker repos
-    const queries = [
-      api.get('/repos/bunkerity/bunkerweb'),
-      api.get('/search/repositories?q=topic:waf+topic:security+stars:>500&sort=stars&per_page=8'),
-      api.get('/search/repositories?q=topic:nginx+topic:security+stars:>1000&sort=stars&per_page=6'),
-      api.get('/search/repositories?q=topic:web-security+stars:>2000&sort=stars&per_page=6'),
-    ];
-    const [bw, wafRes, nginxRes, wsecRes] = await Promise.all(queries);
-
-    // Merge and deduplicate
-    const seen = new Set();
-    const all = [];
-    const addRepo = (r, featured=false) => {
-      if(!seen.has(r.full_name)){
-        seen.add(r.full_name);
-        all.push({...r, _featured: featured});
-      }
-    };
-    addRepo(bw, true);
-    (wafRes.items||[]).forEach(r=>addRepo(r));
-    (nginxRes.items||[]).forEach(r=>addRepo(r));
-    (wsecRes.items||[]).forEach(r=>addRepo(r));
-
-    STATE.community = all;
-    document.getElementById('navCommunityBadge').textContent = all.length;
-    renderCommunity();
-  }catch(e){
-    document.getElementById('communityGrid').innerHTML=`<div class="empty"><span class="icon">⚠️</span><p>${esc(e.message)}</p></div>`;
-  }
+  document.getElementById('communityGrid').innerHTML=`<div class="loading-wrap"><div class="spinner"></div>Loading community repos…</div>`;
+  const results = await Promise.allSettled(
+    COMMUNITY_REPOS.map(({owner, repo}) => gh(`/repos/${owner}/${repo}`))
+  );
+  const all = results
+    .filter(r => r.status === 'fulfilled')
+    .map((r, i) => ({...r.value, _featured: i===0}));
+  STATE.community = all;
+  document.getElementById('navCommunityBadge').textContent = all.length;
+  renderCommunity();
 }
 
 function filterCommunity(v){ STATE.communitySearch=v.toLowerCase(); renderCommunity(); }
 
-function filterCommunityTopic(topic, btn){
-  STATE.communityTopic = topic;
-  document.querySelectorAll('#communityFilters .filter-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  renderCommunity();
-}
-
 function renderCommunity(){
   const sort   = document.getElementById('communitySort').value;
   const search = STATE.communitySearch;
-  const topic  = STATE.communityTopic;
 
   let repos = [...STATE.community];
 
@@ -1460,12 +1459,8 @@ function renderCommunity(){
     (r.description||'').toLowerCase().includes(search)
   );
 
-  if(topic !== 'all'){
-    repos = repos.filter(r=>(r.topics||[]).some(t=>t.includes(topic)));
-  }
-
   if(sort==='updated') repos.sort((a,b)=>new Date(b.pushed_at)-new Date(a.pushed_at));
-  else if(sort==='forks')  repos.sort((a,b)=>b.forks_count-a.stargazers_count);
+  else if(sort==='forks')  repos.sort((a,b)=>b.forks_count-a.forks_count);
   else if(sort==='issues') repos.sort((a,b)=>b.open_issues_count-a.open_issues_count);
   else repos.sort((a,b)=>b.stargazers_count-a.stargazers_count); // stars default
 
@@ -1735,6 +1730,9 @@ function filterIssueState(state, btn){
 function filterIssueRepo(v){ STATE.issueRepoFilter=v.toLowerCase(); renderGlobalIssues(); }
 
 function renderGlobalIssues(){
+  document.getElementById('issuesSubtitle').innerHTML = STATE.token
+    ? 'Issues involving you across all repositories'
+    : 'Issues from <a href="https://github.com/bunkerity/bunkerweb" target="_blank" style="color:var(--green)">bunkerity/bunkerweb</a> — <a href="#" onclick="openModal(\'loginModal\');return false;" style="color:var(--txt2)">sign in</a> to see your own';
   let issues=[...STATE.issues];
   if(STATE.issueRepoFilter) issues=issues.filter(i=>(i.repository?.full_name||'').toLowerCase().includes(STATE.issueRepoFilter));
   document.getElementById('globalIssuesTable').innerHTML = renderIssueTable(issues,null,true);
@@ -1782,6 +1780,9 @@ async function filterPrState(state, btn){
 function filterPrRepo(v){ STATE.prRepoFilter=v.toLowerCase(); renderGlobalPRs(); }
 
 function renderGlobalPRs(){
+  document.getElementById('prsSubtitle').innerHTML = STATE.token
+    ? 'Pull requests involving you across all repositories'
+    : 'Pull requests from <a href="https://github.com/bunkerity/bunkerweb" target="_blank" style="color:var(--green)">bunkerity/bunkerweb</a> — <a href="#" onclick="openModal(\'loginModal\');return false;" style="color:var(--txt2)">sign in</a> to see your own';
   let prs=[...STATE.prs];
   if(STATE.prRepoFilter) prs=prs.filter(p=>(p.repository_url||'').toLowerCase().includes(STATE.prRepoFilter));
   document.getElementById('globalPRsTable').innerHTML = renderPRTable(prs,null,true);
@@ -1852,17 +1853,21 @@ function renderIssueModal(repo, issue, comments){
     : '';
 
   const isOpen = issue.state==='open';
-  document.getElementById('issueModalFooter').innerHTML = `
+  document.getElementById('issueModalFooter').innerHTML = STATE.token ? `
     <button class="btn-sm primary"  onclick="submitIssueComment()">💬 Comment</button>
     ${isOpen
       ?`<button class="btn-sm danger"   onclick="changeIssueState('closed')">✕ Close Issue</button>
         <button class="btn-sm ghost"    onclick="openEditIssue()">✏️ Edit</button>`
       :`<button class="btn-sm success"  onclick="changeIssueState('open')">↩ Reopen Issue</button>`}
     <a href="${esc(issue.html_url)}" target="_blank" class="btn-sm ghost" style="text-decoration:none">Open on GitHub ↗</a>
+  ` : `
+    <span style="font-size:12px;color:var(--txt3)">🔒 <a href="#" onclick="openModal('loginModal');return false;" style="color:var(--green)">Sign in</a> to comment or edit</span>
+    <a href="${esc(issue.html_url)}" target="_blank" class="btn-sm ghost" style="text-decoration:none;margin-left:auto">Open on GitHub ↗</a>
   `;
 }
 
 async function submitIssueComment(){
+  if(!requireAuth('add a comment')) return;
   const body = document.getElementById('issueCommentInput').value.trim();
   if(!body){toast('Comment cannot be empty','error');return;}
   const {repo,number} = STATE.currentIssue;
@@ -1875,6 +1880,7 @@ async function submitIssueComment(){
 }
 
 async function changeIssueState(state){
+  if(!requireAuth('change issue state')) return;
   const {repo,number} = STATE.currentIssue;
   try{
     await api.patch(`/repos/${repo}/issues/${number}`,{state});
@@ -1885,6 +1891,7 @@ async function changeIssueState(state){
 }
 
 function openEditIssue(){
+  if(!requireAuth('edit this issue')) return;
   const {issue,repo,number}=STATE.currentIssue;
   const body=document.getElementById('issueModalBody');
   body.innerHTML=`
@@ -1911,6 +1918,7 @@ async function saveEditIssue(){
 }
 
 function openNewIssue(){
+  if(!requireAuth('create an issue')) return;
   document.getElementById('newIssueTitle').value='';
   document.getElementById('newIssueBody').value='';
   document.getElementById('newIssueLabels').value='';
@@ -1970,8 +1978,8 @@ function renderPRModal(repo,pr,comments){
     ?comments.map(c=>`<div class="comment-item"><div class="comment-meta"><img src="${esc(c.user.avatar_url)}" style="width:18px;height:18px;border-radius:50%"><b>${esc(c.user.login)}</b> ${timeAgo(c.created_at)}</div><div class="comment-body">${esc(c.body)}</div></div>`).join(''):'';
 
   const isOpen=pr.state==='open'&&!pr.merged;
-  document.getElementById('reviewSection').style.display=isOpen?'block':'none';
-  document.getElementById('prModalFooter').innerHTML=`
+  document.getElementById('reviewSection').style.display=isOpen&&STATE.token?'block':'none';
+  document.getElementById('prModalFooter').innerHTML= STATE.token ? `
     <button class="btn-sm primary"   onclick="submitPrComment()">💬 Comment</button>
     ${isOpen&&pr.mergeable!==false?`<button class="btn-sm success" onclick="mergePR('merge')">⬡ Merge</button>
       <button class="btn-sm purple"  onclick="mergePR('squash')">⬡ Squash</button>
@@ -1979,10 +1987,14 @@ function renderPRModal(repo,pr,comments){
       <button class="btn-sm danger"  onclick="changePrState('closed')">✕ Close PR</button>`:''}
     ${pr.state==='closed'&&!pr.merged?`<button class="btn-sm success" onclick="changePrState('open')">↩ Reopen</button>`:''}
     <a href="${esc(pr.html_url)}" target="_blank" class="btn-sm ghost" style="text-decoration:none">GitHub ↗</a>
+  ` : `
+    <span style="font-size:12px;color:var(--txt3)">🔒 <a href="#" onclick="openModal('loginModal');return false;" style="color:var(--green)">Sign in</a> to comment, review, or merge</span>
+    <a href="${esc(pr.html_url)}" target="_blank" class="btn-sm ghost" style="text-decoration:none;margin-left:auto">GitHub ↗</a>
   `;
 }
 
 async function submitReview(event){
+  if(!requireAuth('submit a review')) return;
   const {repo,number}=STATE.currentPR;
   const body=document.getElementById('reviewComment').value.trim();
   if(event==='REQUEST_CHANGES'&&!body){toast('Body required for Request Changes','error');return;}
@@ -1994,6 +2006,7 @@ async function submitReview(event){
 }
 
 async function submitPrComment(){
+  if(!requireAuth('add a comment')) return;
   const body=document.getElementById('prCommentInput').value.trim();
   if(!body){toast('Comment cannot be empty','error');return;}
   const {repo,number}=STATE.currentPR;
@@ -2006,6 +2019,7 @@ async function submitPrComment(){
 }
 
 async function mergePR(method){
+  if(!requireAuth('merge this PR')) return;
   const {repo,number}=STATE.currentPR;
   if(!confirm(`Merge PR #${number} using ${method}?`))return;
   try{
@@ -2017,6 +2031,7 @@ async function mergePR(method){
 }
 
 async function changePrState(state){
+  if(!requireAuth('change PR state')) return;
   const {repo,number}=STATE.currentPR;
   try{
     await api.patch(`/repos/${repo}/pulls/${number}`,{state});
@@ -2047,6 +2062,11 @@ function hexRgb(hex){
 // BOOT
 // ════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', async ()=>{
+  // Always load public data immediately — no login required
+  loadBWSpotlight();
+  loadCommunity();
+  loadGlobalIssues();
+  loadGlobalPRs();
   if(STATE.token){
     try{
       await initApp();
