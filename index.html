@@ -1381,12 +1381,10 @@ function updateDashboard(){ /* stats already set in load functions */ }
 function gotoPage(page, navEl){
   document.querySelectorAll('.page-view').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  if(navEl) navEl.classList.add('active');
-  else {
-    const match = document.querySelector(`.nav-item[data-page="${page}"]`);
-    if(match) match.classList.add('active');
-  }
+  // Clear active on ALL nav elements (both sidebar items and top nav buttons)
+  document.querySelectorAll('.nav-item, .tnav-btn').forEach(n=>n.classList.remove('active'));
+  // Activate every element that has data-page matching this page
+  document.querySelectorAll(`[data-page="${page}"]`).forEach(n=>n.classList.add('active'));
   const labels = {dashboard:'Dashboard',repos:'Repositories',issues:'Issues',prs:'Pull Requests','repo-detail':STATE.currentRepo||'Repo',community:'Community'};
   document.getElementById('breadcrumb').innerHTML = `<span class="current">${esc(labels[page]||page)}</span>`;
 }
@@ -1411,33 +1409,32 @@ async function loadBWSpotlight(){
     const prCount   = Array.isArray(openPRs) ? openPRs.length : 0;
     const issueCount = Math.max(0, repo.open_issues_count - prCount);
 
-    // Dashboard spotlight
-    document.getElementById('bwStars').textContent  = fmt(repo.stargazers_count);
-    document.getElementById('bwIssues').textContent = fmt(issueCount);
-    document.getElementById('bwPRs').textContent    = fmt(prCount);
-    document.getElementById('bwForks').textContent  = fmt(repo.forks_count);
+    const exact = n => n.toLocaleString();
 
-    // Community spotlight banner
+    // Dashboard spotlight
+    document.getElementById('bwStars').textContent  = exact(repo.stargazers_count);
+    document.getElementById('bwIssues').textContent = exact(issueCount);
+    document.getElementById('bwPRs').textContent    = exact(prCount);
+    document.getElementById('bwForks').textContent  = exact(repo.forks_count);
+
+    // Community spotlight banner — uses existing bw-spotlight-* classes
     document.getElementById('communitySpotlight').innerHTML = `
       <div class="community-spotlight-banner">
-        <div class="csb-left">
-          <div class="csb-logo">🛡️</div>
-          <div class="csb-info">
-            <div class="csb-name">
+        <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:220px">
+          <div class="bw-spotlight-logo">🛡️</div>
+          <div class="bw-spotlight-info">
+            <div class="bw-spotlight-name">
               <a href="https://github.com/bunkerity/bunkerweb" target="_blank">bunkerity / bunkerweb</a>
-              <span class="chip blue" style="font-size:10px;padding:2px 8px;vertical-align:middle;margin-left:6px">Featured</span>
+              <span class="bw-pill info" style="font-size:10px;padding:2px 8px">Featured</span>
             </div>
-            <div class="csb-sub">${esc(repo.description||'')} · Updated ${timeAgo(repo.pushed_at)}</div>
+            <div class="bw-spotlight-desc">${esc(repo.description||'')} · Updated ${timeAgo(repo.pushed_at)}</div>
           </div>
         </div>
-        <div class="csb-stats">
-          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-orange)">⭐ ${fmt(repo.stargazers_count)}</div><div class="csb-stat-lbl">Stars</div></div>
-          <div class="csb-stat-div"></div>
-          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-green)">${fmt(issueCount)}</div><div class="csb-stat-lbl">🐛 Issues</div></div>
-          <div class="csb-stat-div"></div>
-          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-purple)">${fmt(prCount)}</div><div class="csb-stat-lbl">🔀 PRs</div></div>
-          <div class="csb-stat-div"></div>
-          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-text2)">${fmt(repo.forks_count)}</div><div class="csb-stat-lbl">🍴 Forks</div></div>
+        <div class="bw-spotlight-stats">
+          <div class="bw-sstat"><div class="bw-sstat-val" style="color:var(--amber)">⭐ ${exact(repo.stargazers_count)}</div><div class="bw-sstat-lbl">Stars</div></div>
+          <div class="bw-sstat"><div class="bw-sstat-val" style="color:var(--green)">${exact(issueCount)}</div><div class="bw-sstat-lbl">🐛 Issues</div></div>
+          <div class="bw-sstat"><div class="bw-sstat-val" style="color:var(--purple)">${exact(prCount)}</div><div class="bw-sstat-lbl">🔀 PRs</div></div>
+          <div class="bw-sstat"><div class="bw-sstat-val" style="color:var(--txt2)">${exact(repo.forks_count)}</div><div class="bw-sstat-lbl">🍴 Forks</div></div>
         </div>
       </div>`;
   }catch(e){ /* non-fatal */ }
