@@ -981,6 +981,11 @@ textarea.form-input { resize: vertical; min-height: 85px; }
       </div>
       <div class="page-subtitle">BunkerWeb and related open-source projects — <strong style="color:var(--green)">no login needed</strong></div>
       <div id="communitySpotlight"></div>
+      <div class="filter-bar" id="communityCategFilters">
+        <button class="filter-btn active" onclick="filterCommunityCategory('all',this)">All</button>
+        <button class="filter-btn" onclick="filterCommunityCategory('plugins',this)">🧩 Plugins</button>
+        <button class="filter-btn" onclick="filterCommunityCategory('external',this)">🔗 External</button>
+      </div>
       <div id="communityGrid" class="community-grid">
         <div class="loading-wrap"><div class="spinner"></div>Loading…</div>
       </div>
@@ -989,18 +994,35 @@ textarea.form-input { resize: vertical; min-height: 85px; }
   </div><!-- /content -->
 </div><!-- /app-body -->
 
+<!-- FOOTER -->
+<footer style="background:var(--bg2);border-top:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--txt3)">
+  <span>
+    Inspired by and only possible thanks to the
+    <a href="https://github.com/bunkerity/bunkerweb" target="_blank" style="color:var(--green);font-weight:700;text-decoration:none">BunkerWeb</a>
+    project by <a href="https://github.com/bunkerity" target="_blank" style="color:var(--txt2);text-decoration:none">bunkerity</a>.
+  </span>
+  <span style="display:flex;align-items:center;gap:6px">
+    <svg viewBox="0 0 16 16" style="width:13px;height:13px;fill:var(--txt3);flex-shrink:0"><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/></svg>
+    Your GitHub access token is stored only in <b style="color:var(--txt2)">your browser's localStorage</b> — it never leaves your device.
+  </span>
+</footer>
+
 <!-- LOGIN MODAL -->
 <div class="modal-overlay" id="loginModal">
   <div class="modal" style="width:min(440px,96vw)">
     <div class="modal-top">
-      <div class="modal-title">Sign in to GitHub</div>
+      <div class="modal-title">
+        <svg viewBox="0 0 16 16" style="width:16px;height:16px;fill:currentColor;vertical-align:middle;margin-right:6px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        Connect your GitHub account
+      </div>
       <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
     </div>
     <div class="login-modal-inner">
       <div class="lm-logo">🛡️</div>
-      <div class="lm-title">BunkerWeb Dashboard</div>
+      <div class="lm-title">Sign in with GitHub</div>
       <div class="lm-subtitle">
-        Sign in to create issues, review PRs, and merge code.<br>
+        You are connecting your <b style="color:var(--txt)">github.com</b> account to enable write actions
+        (create issues, comment, review PRs, merge).<br>
         <span style="color:var(--green);font-weight:700">Login is optional</span> — issues &amp; PRs are visible without it.
       </div>
       <input class="form-input" id="clientIdInput" placeholder="Your GitHub OAuth client_id">
@@ -1033,7 +1055,8 @@ textarea.form-input { resize: vertical; min-height: 85px; }
         🔑 Sign in with GitHub
       </button>
       <div style="margin-top:10px;font-size:11px;color:var(--txt3);line-height:1.7">
-        Device Flow OAuth · No backend · No server-side secrets
+        Device Flow OAuth · No backend · No server-side secrets<br>
+        Your GitHub token is saved in <b style="color:var(--txt2)">your browser's localStorage</b> only — it never leaves your device.
       </div>
     </div>
   </div>
@@ -1130,7 +1153,7 @@ const STATE = {
   currentIssue: null,
   currentPR: null,
   activeRepoTab: 'overview',
-  community: [], communityTopic: 'all', communitySearch: '',
+  community: [], communityTopic: 'all', communitySearch: '', communityCategory: 'all',
   bwRepo: null,
 };
 
@@ -1185,10 +1208,12 @@ const api = {
 };
 
 function updateRate(rem, lim){
+  const el = document.getElementById('rateInfo');
+  if(!el) return;
   const pct = Math.floor((rem/lim)*100);
-  const dot = document.getElementById('rateDot');
-  dot.style.background = pct>50?'var(--bw-green)':pct>20?'var(--bw-orange)':'var(--bw-red)';
-  document.getElementById('rateText').textContent = `API: ${rem}/${lim} left`;
+  el.textContent = `API ${rem}/${lim}`;
+  el.style.color = pct>50?'var(--green)':pct>20?'var(--amber)':'var(--red)';
+  el.style.borderColor = pct>50?'rgba(0,208,132,.3)':pct>20?'rgba(245,158,11,.3)':'rgba(244,63,94,.3)';
 }
 
 // ════════════════════════════════════════════
@@ -1377,18 +1402,18 @@ function onGlobalSearch(v){
 // ════════════════════════════════════════════
 async function loadBWSpotlight(){
   try{
-    const [repo, prs] = await Promise.all([
-      api.get('/repos/bunkerity/bunkerweb'),
-      api.get('/repos/bunkerity/bunkerweb/pulls?state=open&per_page=1'),
+    // Both endpoints are fully public — no auth required
+    const [repo, openPRs] = await Promise.all([
+      gh('/repos/bunkerity/bunkerweb'),
+      gh('/repos/bunkerity/bunkerweb/pulls?state=open&per_page=100'),
     ]);
     STATE.bwRepo = repo;
-    // Count open PRs via search for accuracy
-    const prSearch = await api.get('/search/issues?q=repo:bunkerity/bunkerweb+is:pr+is:open&per_page=1');
-    const prCount = prSearch.total_count || prs.length;
+    const prCount   = Array.isArray(openPRs) ? openPRs.length : 0;
+    const issueCount = Math.max(0, repo.open_issues_count - prCount);
 
     // Dashboard spotlight
     document.getElementById('bwStars').textContent  = fmt(repo.stargazers_count);
-    document.getElementById('bwIssues').textContent = fmt(repo.open_issues_count - prCount);
+    document.getElementById('bwIssues').textContent = fmt(issueCount);
     document.getElementById('bwPRs').textContent    = fmt(prCount);
     document.getElementById('bwForks').textContent  = fmt(repo.forks_count);
 
@@ -1408,7 +1433,7 @@ async function loadBWSpotlight(){
         <div class="csb-stats">
           <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-orange)">⭐ ${fmt(repo.stargazers_count)}</div><div class="csb-stat-lbl">Stars</div></div>
           <div class="csb-stat-div"></div>
-          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-green)">${fmt(repo.open_issues_count - prCount)}</div><div class="csb-stat-lbl">🐛 Issues</div></div>
+          <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-green)">${fmt(issueCount)}</div><div class="csb-stat-lbl">🐛 Issues</div></div>
           <div class="csb-stat-div"></div>
           <div class="csb-stat"><div class="csb-stat-val" style="color:var(--bw-purple)">${fmt(prCount)}</div><div class="csb-stat-lbl">🔀 PRs</div></div>
           <div class="csb-stat-div"></div>
@@ -1421,26 +1446,40 @@ async function loadBWSpotlight(){
 // ════════════════════════════════════════════
 // COMMUNITY
 // ════════════════════════════════════════════
-// ── Edit this list to control which repos appear in the Community tab.
-// Each entry maps to https://github.com/{owner}/{repo}
-const COMMUNITY_REPOS = [
-  { owner: 'bunkerity',     repo: 'bunkerweb',  url: 'https://github.com/bunkerity/bunkerweb' },
-  { owner: 'crowdsecurity',  repo: 'crowdsec',   url: 'https://github.com/crowdsecurity/crowdsec' },
-  { owner: 'traefik',       repo: 'traefik',    url: 'https://github.com/traefik/traefik' },
-  { owner: 'certbot',       repo: 'certbot',    url: 'https://github.com/certbot/certbot' },
-  { owner: 'fail2ban',      repo: 'fail2ban',   url: 'https://github.com/fail2ban/fail2ban' },
-  { owner: 'nicholaswilde', repo: 'helm-charts', url: 'https://github.com/nicholaswilde/helm-charts' },
-  { owner: 'getsentry',     repo: 'sentry',     url: 'https://github.com/getsentry/sentry' },
+// Fallback list used only if the external JSON cannot be fetched.
+// category: 'plugins' | 'external'
+const COMMUNITY_REPOS_FALLBACK = [
+  { owner: 'exalmatuz',      repo: 'bunkerweb-openai-chatgpt-user-ips', url: 'https://github.com/exalmatuz/bunkerweb-openai-chatgpt-user-ips', category: 'plugins'  },
+  { owner: 'drewpo28',       repo: 'bunkerweb-plugin-telegram',         url: 'https://github.com/drewpo28/bunkerweb-plugin-telegram',         category: 'plugins'  },
+  { owner: 'Ayushsinha322',  repo: 'bunkerweb-request-logger',          url: 'https://github.com/Ayushsinha322/bunkerweb-request-logger',     category: 'external' },
+  { owner: 'palmcoasty',     repo: 'bunkerweb-config-generator',        url: 'https://github.com/palmcoasty/bunkerweb-config-generator',      category: 'external' },
+  { owner: 'palmcoasty',     repo: 'bunkerweb-confs-taskboard',         url: 'https://github.com/palmcoasty/bunkerweb-confs-taskboard',       category: 'external' },
 ];
+
+// External config — update this URL if you move the JSON file
+const COMMUNITY_JSON_URL = 'https://raw.githubusercontent.com/palmcoasty/bunkerweb-community-board/refs/heads/main/community-projects.json';
 
 async function loadCommunity(){
   document.getElementById('communityGrid').innerHTML=`<div class="loading-wrap"><div class="spinner"></div>Loading community repos…</div>`;
+
+  // Fetch repo list from external JSON; fall back to hardcoded list on error
+  let repoList = COMMUNITY_REPOS_FALLBACK;
+  try{
+    const res = await fetch(COMMUNITY_JSON_URL);
+    if(res.ok){
+      const data = await res.json();
+      if(Array.isArray(data) && data.length) repoList = data;
+    }
+  }catch(_){ /* use fallback silently */ }
+
   const results = await Promise.allSettled(
-    COMMUNITY_REPOS.map(({owner, repo}) => gh(`/repos/${owner}/${repo}`))
+    repoList.map(({owner, repo}) => gh(`/repos/${owner}/${repo}`))
   );
-  const all = results
-    .filter(r => r.status === 'fulfilled')
-    .map((r, i) => ({...r.value, _featured: i===0}));
+  const all = [];
+  results.forEach((r, i) => {
+    if(r.status === 'fulfilled')
+      all.push({...r.value, _featured: i===0, _category: repoList[i].category || 'external'});
+  });
   STATE.community = all;
   document.getElementById('navCommunityBadge').textContent = all.length;
   renderCommunity();
@@ -1448,9 +1487,17 @@ async function loadCommunity(){
 
 function filterCommunity(v){ STATE.communitySearch=v.toLowerCase(); renderCommunity(); }
 
+function filterCommunityCategory(cat, btn){
+  STATE.communityCategory = cat;
+  document.querySelectorAll('#communityCategFilters .filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCommunity();
+}
+
 function renderCommunity(){
   const sort   = document.getElementById('communitySort').value;
   const search = STATE.communitySearch;
+  const cat    = STATE.communityCategory;
 
   let repos = [...STATE.community];
 
@@ -1458,6 +1505,8 @@ function renderCommunity(){
     r.full_name.toLowerCase().includes(search) ||
     (r.description||'').toLowerCase().includes(search)
   );
+
+  if(cat !== 'all') repos = repos.filter(r => r._category === cat);
 
   if(sort==='updated') repos.sort((a,b)=>new Date(b.pushed_at)-new Date(a.pushed_at));
   else if(sort==='forks')  repos.sort((a,b)=>b.forks_count-a.forks_count);
@@ -1484,7 +1533,11 @@ function renderCommunity(){
         <img class="cc-avatar" src="${esc(r.owner.avatar_url)}" alt="" loading="lazy">
         <div class="cc-title-block">
           <a class="cc-repo-name" href="${esc(r.html_url)}" target="_blank" onclick="event.stopPropagation()">${esc(r.full_name)}</a>
-          <div class="cc-owner">${esc(r.owner.type)} · ${r.private?'🔒 private':'🌐 public'}</div>
+          <div class="cc-owner">
+            ${r._category==='plugins'?`<span style="background:var(--pdim);color:var(--purple);border:1px solid rgba(167,139,250,.3);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:5px">🧩 plugin</span>`:''}
+            ${r._category==='external'?`<span style="background:var(--tdim);color:var(--teal);border:1px solid rgba(6,182,212,.25);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:5px">🔗 external</span>`:''}
+            ${esc(r.owner.type)} · ${r.private?'🔒 private':'🌐 public'}
+          </div>
         </div>
         <div class="cc-star-badge" style="color:${starColor}">
           ⭐ ${fmt(r.stargazers_count)}
