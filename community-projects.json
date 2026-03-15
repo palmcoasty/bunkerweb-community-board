@@ -1,1 +1,7 @@
-
+[
+  { "creator": "exalmatuz",     "repo": "bunkerweb-openai-chatgpt-user-ips", "url": "https://github.com/exalmatuz/bunkerweb-openai-chatgpt-user-ips", "category": "plugins"  },
+  { "creator": "drewpo28",      "repo": "bunkerweb-plugin-telegram",         "url": "https://github.com/drewpo28/bunkerweb-plugin-telegram",         "category": "plugins"  },
+  { "creator": "Ayushsinha322", "repo": "bunkerweb-request-logger",          "url": "https://github.com/Ayushsinha322/bunkerweb-request-logger",     "category": "external" },
+  { "creator": "palmcoasty",    "repo": "bunkerweb-config-generator",        "url": "https://github.com/palmcoasty/bunkerweb-config-generator",      "category": "external" },
+  { "creator": "palmcoasty",    "repo": "bunkerweb-confs-taskboard",         "url": "https://github.com/palmcoasty/bunkerweb-confs-taskboard",       "category": "external" }
+]
