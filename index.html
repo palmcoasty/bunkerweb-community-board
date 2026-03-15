@@ -785,7 +785,7 @@ textarea.form-input { resize: vertical; min-height: 85px; }
   </nav>
   <div class="top-right">
     <input class="top-search" id="globalSearch" placeholder="🔍  Search…" oninput="onGlobalSearch(this.value)">
-    <div class="rate-badge" id="rateInfo">API</div>
+    <div class="rate-badge" id="rateInfo" onclick="showRatePopup()" style="cursor:pointer" title="GitHub API rate limit — click for details">API</div>
     <div id="headerAuth">
       <button class="btn-signin" onclick="openModal('loginModal')">Sign in</button>
     </div>
@@ -931,11 +931,11 @@ textarea.form-input { resize: vertical; min-height: 85px; }
         <button class="tab" data-rtab="commits"  onclick="switchRepoTab('commits',this)">Commits</button>
         <button class="tab" data-rtab="releases" onclick="switchRepoTab('releases',this)">Releases</button>
       </div>
-      <div id="rdPanel-overview"></div>
-      <div id="rdPanel-issues"   style="display:none"></div>
-      <div id="rdPanel-prs"      style="display:none"></div>
-      <div id="rdPanel-commits"  style="display:none"></div>
-      <div id="rdPanel-releases" style="display:none"></div>
+      <div id="rdPanel-overview" class="rd-panel"></div>
+      <div id="rdPanel-issues"   class="rd-panel" style="display:none"></div>
+      <div id="rdPanel-prs"      class="rd-panel" style="display:none"></div>
+      <div id="rdPanel-commits"  class="rd-panel" style="display:none"></div>
+      <div id="rdPanel-releases" class="rd-panel" style="display:none"></div>
     </div>
 
     <!-- ISSUES -->
@@ -1216,6 +1216,18 @@ function updateRate(rem, lim){
   el.style.borderColor = pct>50?'rgba(0,208,132,.3)':pct>20?'rgba(245,158,11,.3)':'rgba(244,63,94,.3)';
 }
 
+function showRatePopup(){
+  const el = document.getElementById('rateInfo');
+  const text = el ? el.textContent : 'API';
+  const isAuthed = !!STATE.token;
+  toast(
+    isAuthed
+      ? `${text} — authenticated (5,000 req/hr)`
+      : `${text} — unauthenticated (60 req/hr). Log in to raise to 5,000/hr.`,
+    isAuthed ? 'success' : 'info'
+  );
+}
+
 // ════════════════════════════════════════════
 // WRITE-ACTION GUARD
 // ════════════════════════════════════════════
@@ -1386,7 +1398,8 @@ function gotoPage(page, navEl){
   // Activate every element that has data-page matching this page
   document.querySelectorAll(`[data-page="${page}"]`).forEach(n=>n.classList.add('active'));
   const labels = {dashboard:'Dashboard',repos:'Repositories',issues:'Issues',prs:'Pull Requests','repo-detail':STATE.currentRepo||'Repo',community:'Community'};
-  document.getElementById('breadcrumb').innerHTML = `<span class="current">${esc(labels[page]||page)}</span>`;
+  const bc = document.getElementById('breadcrumb');
+  if(bc) bc.innerHTML = `<span class="current">${esc(labels[page]||page)}</span>`;
 }
 
 function onGlobalSearch(v){
@@ -1521,35 +1534,35 @@ function renderCommunity(){
   el.innerHTML = repos.map(r=>{
     const rank = rankMap[r.full_name];
     const topics = (r.topics||[]).slice(0,4);
-    const starColor = r.stargazers_count > 10000 ? 'var(--bw-orange)'
-                    : r.stargazers_count > 1000  ? 'var(--bw-text)'
-                    : 'var(--bw-text2)';
+    const starColor = r.stargazers_count > 10000 ? 'var(--amber)'
+                    : r.stargazers_count > 1000  ? 'var(--txt)'
+                    : 'var(--txt2)';
     return `
-    <div class="community-card${r._featured?' featured':''}" onclick="openCommunityRepo('${esc(r.full_name)}')">
-      <div class="cc-header">
+    <div class="cc-card${r._featured?' featured':''}" onclick="openCommunityRepo('${esc(r.full_name)}')">
+      <div class="cc-top">
         <img class="cc-avatar" src="${esc(r.owner.avatar_url)}" alt="" loading="lazy">
-        <div class="cc-title-block">
-          <a class="cc-repo-name" href="${esc(r.html_url)}" target="_blank" onclick="event.stopPropagation()">${esc(r.full_name)}</a>
+        <div class="cc-title">
+          <a class="cc-name" href="${esc(r.html_url)}" target="_blank" onclick="event.stopPropagation()">${esc(r.full_name)}</a>
           <div class="cc-owner">
             ${r._category==='plugins'?`<span style="background:var(--pdim);color:var(--purple);border:1px solid rgba(167,139,250,.3);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:5px">🧩 plugin</span>`:''}
             ${r._category==='external'?`<span style="background:var(--tdim);color:var(--teal);border:1px solid rgba(6,182,212,.25);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;margin-right:5px">🔗 external</span>`:''}
             ${esc(r.owner.type)} · ${r.private?'🔒 private':'🌐 public'}
           </div>
         </div>
-        <div class="cc-star-badge" style="color:${starColor}">
+        <div class="cc-stars" style="color:${starColor}">
           ⭐ ${fmt(r.stargazers_count)}
         </div>
       </div>
       <div class="cc-body">
         <div class="cc-desc">${esc(r.description||'No description provided.')}</div>
-        ${topics.length?`<div class="cc-topics">${topics.map(t=>`<span class="cc-topic">${esc(t)}</span>`).join('')}</div>`:''}
+        ${topics.length?`<div class="cc-tags">${topics.map(t=>`<span class="rdh-topic">${esc(t)}</span>`).join('')}</div>`:''}
       </div>
-      <div class="cc-footer">
-        ${r.language?`<span class="cc-stat"><span style="width:9px;height:9px;border-radius:50%;background:${langColor(r.language)};display:inline-block"></span><b>${esc(r.language)}</b></span>`:''}
-        <span class="cc-stat">🍴 <b>${fmt(r.forks_count)}</b></span>
-        <span class="cc-stat">🐛 <b>${fmt(r.open_issues_count)}</b> issues</span>
-        <span class="cc-stat">🕒 ${timeAgo(r.pushed_at)}</span>
-        ${r._featured?`<span class="cc-star-rank" style="color:var(--bw-blue)">⭐ Featured</span>`:`<span class="cc-star-rank">#${rank} by stars</span>`}
+      <div class="cc-foot">
+        ${r.language?`<span class="cc-foot-item"><span style="width:9px;height:9px;border-radius:50%;background:${langColor(r.language)};display:inline-block"></span><b>${esc(r.language)}</b></span>`:''}
+        <span class="cc-foot-item">🍴 <b>${fmt(r.forks_count)}</b></span>
+        <span class="cc-foot-item">🐛 <b>${fmt(r.open_issues_count)}</b> issues</span>
+        <span class="cc-foot-item">🕒 ${timeAgo(r.pushed_at)}</span>
+        ${r._featured?`<span class="cc-rank" style="color:var(--teal)">⭐ Featured</span>`:`<span class="cc-rank">#${rank} by stars</span>`}
       </div>
     </div>`;
   }).join('');
@@ -1606,17 +1619,18 @@ async function openRepo(fullName){
   STATE.currentRepo = fullName;
   document.querySelectorAll('.page-view').forEach(p=>p.classList.remove('active'));
   document.getElementById('page-repo-detail').classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.getElementById('breadcrumb').innerHTML = `
-    <span style="cursor:pointer;color:var(--bw-blue)" onclick="gotoPage('repos',null)">Repos</span>
-    <span class="sep">/</span><span class="current">${esc(fullName)}</span>`;
+  document.querySelectorAll('.nav-item, .tnav-btn').forEach(n=>n.classList.remove('active'));
+  const bc2 = document.getElementById('breadcrumb');
+  if(bc2) bc2.innerHTML = `
+    <span style="cursor:pointer;color:var(--teal)" onclick="gotoPage('repos',null)">Repos</span>
+    <span style="color:var(--txt3);margin:0 4px">/</span><span style="color:var(--txt)">${esc(fullName)}</span>`;
 
   // Reset tabs
   document.querySelectorAll('.tab[data-rtab]').forEach(t=>{t.classList.remove('active');if(t.dataset.rtab==='overview')t.classList.add('active');});
   document.querySelectorAll('.rd-panel').forEach(p=>{p.style.display=p.id==='rdPanel-overview'?'block':'none';});
   STATE.activeRepoTab='overview';
 
-  document.getElementById('repoDetailHeader').innerHTML=`<div class="loading-spinner"><div class="spinner"></div>Loading…</div>`;
+  document.getElementById('repoDetailHeader').innerHTML=`<div class="loading-wrap"><div class="spinner"></div>Loading…</div>`;
   document.getElementById('rdPanel-overview').innerHTML='';
 
   try{
@@ -1639,25 +1653,25 @@ function renderRepoHeader(info){
   const el = document.getElementById('repoDetailHeader');
   el.innerHTML = `
     <div class="repo-detail-header">
-      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:12px">
-        <img src="${esc(info.owner.avatar_url)}" style="width:48px;height:48px;border-radius:10px;border:2px solid var(--bw-border)">
-        <div style="flex:1">
-          <div class="repo-detail-name">
+      <div class="rdh-top">
+        <img class="rdh-avatar" src="${esc(info.owner.avatar_url)}" alt="">
+        <div style="flex:1;min-width:0">
+          <div class="rdh-name">
             <a href="${esc(info.html_url)}" target="_blank">${esc(info.full_name)}</a>
-            ${info.private?`<span class="chip blue" style="font-size:12px;vertical-align:middle;margin-left:8px">private</span>`:''}
-            ${info.fork?`<span class="chip draft" style="font-size:12px;vertical-align:middle;margin-left:8px">fork</span>`:''}
+            ${info.private?`<span class="bw-pill closed" style="font-size:10px;padding:2px 8px;vertical-align:middle;margin-left:8px">private</span>`:''}
+            ${info.fork?`<span class="bw-pill draft" style="font-size:10px;padding:2px 8px;vertical-align:middle;margin-left:8px">fork</span>`:''}
           </div>
-          <div class="repo-detail-desc">${esc(info.description||'No description')}</div>
-          <div class="repo-topics">${(info.topics||[]).map(t=>`<span class="repo-topic">${esc(t)}</span>`).join('')}</div>
+          <div class="rdh-desc">${esc(info.description||'No description')}</div>
+          <div class="rdh-topics">${(info.topics||[]).map(t=>`<span class="rdh-topic">${esc(t)}</span>`).join('')}</div>
         </div>
       </div>
-      <div class="repo-stats-row">
-        <span class="repo-stat">⭐ <b>${fmt(info.stargazers_count)}</b> stars</span>
-        <span class="repo-stat">🍴 <b>${fmt(info.forks_count)}</b> forks</span>
-        <span class="repo-stat">🐛 <b>${fmt(info.open_issues_count)}</b> open issues</span>
-        ${info.language?`<span class="repo-stat"><span class="lang-dot" style="background:${langColor(info.language)}"></span><b>${esc(info.language)}</b></span>`:''}
-        ${info.license?`<span class="repo-stat">📄 <b>${esc(info.license.spdx_id)}</b></span>`:''}
-        <span class="repo-stat" style="margin-left:auto">Updated <b>${timeAgo(info.updated_at)}</b></span>
+      <div class="rdh-stats">
+        <span class="rdh-stat">⭐ <b>${fmt(info.stargazers_count)}</b> stars</span>
+        <span class="rdh-stat">🍴 <b>${fmt(info.forks_count)}</b> forks</span>
+        <span class="rdh-stat">🐛 <b>${fmt(info.open_issues_count)}</b> open issues</span>
+        ${info.language?`<span class="rdh-stat"><span class="lang-dot" style="background:${langColor(info.language)}"></span><b>${esc(info.language)}</b></span>`:''}
+        ${info.license?`<span class="rdh-stat">📄 <b>${esc(info.license.spdx_id)}</b></span>`:''}
+        <span class="rdh-stat" style="margin-left:auto">Updated <b>${timeAgo(info.updated_at)}</b></span>
       </div>
     </div>`;
 }
@@ -1665,18 +1679,18 @@ function renderRepoHeader(info){
 function renderRepoOverview(info){
   document.getElementById('rdPanel-overview').innerHTML = `
     <div class="stat-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="stat-card green"><div class="stat-icon">🐛</div><div class="stat-value">${fmt(info.open_issues_count)}</div><div class="stat-label">Open Issues</div></div>
-      <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-value">${fmt(info.stargazers_count)}</div><div class="stat-label">Stars</div></div>
-      <div class="stat-card orange"><div class="stat-icon">🍴</div><div class="stat-value">${fmt(info.forks_count)}</div><div class="stat-label">Forks</div></div>
+      <div class="stat-card"><div class="stat-icon">🐛</div><div class="stat-value">${fmt(info.open_issues_count)}</div><div class="stat-label">Open Issues</div></div>
+      <div class="stat-card teal"><div class="stat-icon">⭐</div><div class="stat-value">${fmt(info.stargazers_count)}</div><div class="stat-label">Stars</div></div>
+      <div class="stat-card amber"><div class="stat-icon">🍴</div><div class="stat-value">${fmt(info.forks_count)}</div><div class="stat-label">Forks</div></div>
     </div>
-    ${info.homepage?`<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">🌐 Homepage</span></div><div style="padding:14px 18px"><a href="${esc(info.homepage)}" target="_blank" style="color:var(--bw-blue)">${esc(info.homepage)}</a></div></div>`:''}
+    ${info.homepage?`<div class="card" style="margin-bottom:16px"><div class="card-header"><span class="card-title">🌐 Homepage</span></div><div style="padding:14px 18px"><a href="${esc(info.homepage)}" target="_blank" style="color:var(--teal)">${esc(info.homepage)}</a></div></div>`:''}
     <div class="card"><div class="card-header"><span class="card-title">📋 Repository Info</span></div>
     <table class="data-table">
-      <tr><td style="width:160px;color:var(--bw-text2)">Default branch</td><td><code style="color:var(--bw-blue)">${esc(info.default_branch)}</code></td></tr>
-      <tr><td style="color:var(--bw-text2)">Visibility</td><td>${info.private?'🔒 Private':'🌐 Public'}</td></tr>
-      <tr><td style="color:var(--bw-text2)">Created</td><td>${new Date(info.created_at).toLocaleDateString()}</td></tr>
-      <tr><td style="color:var(--bw-text2)">Last push</td><td>${timeAgo(info.pushed_at)}</td></tr>
-      <tr><td style="color:var(--bw-text2)">Watchers</td><td>${fmt(info.watchers_count)}</td></tr>
+      <tr><td style="width:160px;color:var(--txt2)">Default branch</td><td><code style="color:var(--teal)">${esc(info.default_branch)}</code></td></tr>
+      <tr><td style="color:var(--txt2)">Visibility</td><td>${info.private?'🔒 Private':'🌐 Public'}</td></tr>
+      <tr><td style="color:var(--txt2)">Created</td><td>${new Date(info.created_at).toLocaleDateString()}</td></tr>
+      <tr><td style="color:var(--txt2)">Last push</td><td>${timeAgo(info.pushed_at)}</td></tr>
+      <tr><td style="color:var(--txt2)">Watchers</td><td>${fmt(info.watchers_count)}</td></tr>
     </table></div>`;
 }
 
@@ -1709,7 +1723,7 @@ function renderRepoIssues(issues, state='open'){
 async function reloadRepoIssues(state, btn){
   document.querySelectorAll('#rdPanel-issues .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('rdPanel-issues').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('rdPanel-issues').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   try{
     const issues = await api.get(`/repos/${STATE.currentRepo}/issues?state=${state}&per_page=50`);
     STATE.currentRepoData.issues = issues.filter(i=>!i.pull_request);
@@ -1730,7 +1744,7 @@ function renderRepoPRs(prs, state='open'){
 async function reloadRepoPRs(state, btn){
   document.querySelectorAll('#rdPanel-prs .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('rdPanel-prs').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('rdPanel-prs').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   try{
     const prs = await api.get(`/repos/${STATE.currentRepo}/pulls?state=${state}&per_page=50`);
     STATE.currentRepoData.prs = prs;
@@ -1744,10 +1758,10 @@ function renderRepoCommits(commits){
   el.innerHTML=`<div class="card"><table class="data-table">
     <thead><tr><th>SHA</th><th>Message</th><th>Author</th><th>Date</th></tr></thead>
     <tbody>${commits.map(c=>`<tr onclick="window.open('${esc(c.html_url)}','_blank')" title="Open on GitHub">
-      <td><a href="${esc(c.html_url)}" target="_blank" style="color:var(--bw-blue);font-family:monospace;font-size:12px" onclick="event.stopPropagation()">${c.sha.slice(0,7)}</a></td>
+      <td><a href="${esc(c.html_url)}" target="_blank" style="color:var(--teal);font-family:monospace;font-size:12px" onclick="event.stopPropagation()">${c.sha.slice(0,7)}</a></td>
       <td style="max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.commit.message.split('\n')[0])}</td>
-      <td><span style="font-size:12px;color:var(--bw-text2)">${esc(c.commit.author.name)}</span></td>
-      <td><span style="font-size:12px;color:var(--bw-text3)">${timeAgo(c.commit.author.date)}</span></td>
+      <td><span style="font-size:12px;color:var(--txt2)">${esc(c.commit.author.name)}</span></td>
+      <td><span style="font-size:12px;color:var(--txt3)">${timeAgo(c.commit.author.date)}</span></td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -1757,13 +1771,13 @@ function renderRepoReleases(releases){
   el.innerHTML=releases.map(r=>`
     <div class="card" style="margin-bottom:12px">
       <div class="card-header">
-        <span style="color:var(--bw-purple);font-weight:700;font-family:monospace">${esc(r.tag_name)}</span>
+        <span style="color:var(--purple);font-weight:700;font-family:monospace">${esc(r.tag_name)}</span>
         <span class="card-title" style="margin-left:8px">${esc(r.name||r.tag_name)}</span>
         ${r.prerelease?`<span class="chip draft" style="margin-left:8px">pre-release</span>`:''}
-        <span style="margin-left:auto;font-size:12px;color:var(--bw-text3)">${timeAgo(r.published_at)}</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--txt3)">${timeAgo(r.published_at)}</span>
         <a href="${esc(r.html_url)}" target="_blank" class="btn-sm ghost" style="margin-left:8px;text-decoration:none">View ↗</a>
       </div>
-      ${r.body?`<div style="padding:12px 18px;font-size:12px;color:var(--bw-text2);line-height:1.8;white-space:pre-wrap;max-height:100px;overflow:hidden">${esc(r.body.substring(0,400))}</div>`:''}
+      ${r.body?`<div style="padding:12px 18px;font-size:12px;color:var(--txt2);line-height:1.8;white-space:pre-wrap;max-height:100px;overflow:hidden">${esc(r.body.substring(0,400))}</div>`:''}
     </div>`).join('');
 }
 
@@ -1774,7 +1788,7 @@ function filterIssueState(state, btn){
   STATE.issueState=state;
   document.querySelectorAll('#page-issues .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('globalIssuesTable').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('globalIssuesTable').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   loadGlobalIssues();
 }
 function filterIssueRepo(v){ STATE.issueRepoFilter=v.toLowerCase(); renderGlobalIssues(); }
@@ -1803,16 +1817,16 @@ function renderIssueTable(issues, repoName, showRepo=false){
     <tbody>${issues.map(i=>{
       const repo = repoName || (i.repository_url||'').split('/repos/')[1]||'';
       return`<tr onclick="openIssue('${esc(repo)}',${i.number})">
-        ${showRepo?`<td style="font-size:11px;color:var(--bw-text2);white-space:nowrap">${esc(repo)}</td>`:''}
-        <td style="color:var(--bw-text3);font-family:monospace">#${i.number}</td>
+        ${showRepo?`<td style="font-size:11px;color:var(--txt2);white-space:nowrap">${esc(repo)}</td>`:''}
+        <td style="color:var(--txt3);font-family:monospace">#${i.number}</td>
         <td>
           <span class="chip ${i.state}" style="margin-right:6px">● ${i.state}</span>
           <span style="font-weight:500">${esc(i.title)}</span>
-          ${i.comments?`<span style="margin-left:8px;font-size:11px;color:var(--bw-text3)">💬${i.comments}</span>`:''}
+          ${i.comments?`<span style="margin-left:8px;font-size:11px;color:var(--txt3)">💬${i.comments}</span>`:''}
         </td>
         <td>${(i.labels||[]).slice(0,3).map(l=>`<span class="label-chip" style="background:rgba(${hexRgb('#'+l.color)},0.15);color:#${l.color};border-color:rgba(${hexRgb('#'+l.color)},0.4)">${esc(l.name)}</span>`).join(' ')}</td>
-        <td style="font-size:12px;color:var(--bw-text2)">${esc(i.user.login)}</td>
-        <td style="font-size:12px;color:var(--bw-text3);white-space:nowrap">${timeAgo(i.updated_at)}</td>
+        <td style="font-size:12px;color:var(--txt2)">${esc(i.user.login)}</td>
+        <td style="font-size:12px;color:var(--txt3);white-space:nowrap">${timeAgo(i.updated_at)}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -1824,7 +1838,7 @@ async function filterPrState(state, btn){
   STATE.prState=state;
   document.querySelectorAll('#page-prs .filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('globalPRsTable').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('globalPRsTable').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   loadGlobalPRs();
 }
 function filterPrRepo(v){ STATE.prRepoFilter=v.toLowerCase(); renderGlobalPRs(); }
@@ -1854,14 +1868,14 @@ function renderPRTable(prs, repoName, showRepo=false){
       const repo = repoName||(pr.repository_url||'').split('/repos/')[1]||'';
       const state = pr.merged_at?'merged':pr.draft?'draft':pr.state;
       return`<tr onclick="openPR('${esc(repo)}',${pr.number})">
-        ${showRepo?`<td style="font-size:11px;color:var(--bw-text2);white-space:nowrap">${esc(repo)}</td>`:''}
-        <td style="color:var(--bw-text3);font-family:monospace">#${pr.number}</td>
+        ${showRepo?`<td style="font-size:11px;color:var(--txt2);white-space:nowrap">${esc(repo)}</td>`:''}
+        <td style="color:var(--txt3);font-family:monospace">#${pr.number}</td>
         <td>
           <span class="chip ${state}" style="margin-right:6px">${state==='merged'?'⬡':state==='open'?'●':'○'} ${state}</span>
           <span style="font-weight:500">${esc(pr.title)}</span>
         </td>
-        <td style="font-size:12px;color:var(--bw-text2)">${esc(pr.user?.login||'')}</td>
-        <td style="font-size:12px;color:var(--bw-text3);white-space:nowrap">${timeAgo(pr.updated_at)}</td>
+        <td style="font-size:12px;color:var(--txt2)">${esc(pr.user?.login||'')}</td>
+        <td style="font-size:12px;color:var(--txt3);white-space:nowrap">${timeAgo(pr.updated_at)}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -1874,7 +1888,7 @@ async function openIssue(repo, number){
   openModal('issueModal');
   document.getElementById('issueModalTitle').textContent='Loading…';
   document.getElementById('issueModalMeta').innerHTML='';
-  document.getElementById('issueModalBody').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('issueModalBody').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   document.getElementById('issueComments').innerHTML='';
   document.getElementById('issueModalFooter').innerHTML='';
 
@@ -1998,7 +2012,7 @@ async function openPR(repo, number){
   openModal('prModal');
   document.getElementById('prModalTitle').textContent='Loading…';
   document.getElementById('prModalMeta').innerHTML='';
-  document.getElementById('prModalBody').innerHTML=`<div class="loading-spinner"><div class="spinner"></div></div>`;
+  document.getElementById('prModalBody').innerHTML=`<div class="loading-wrap"><div class="spinner"></div></div>`;
   document.getElementById('prComments').innerHTML='';
   document.getElementById('prModalFooter').innerHTML='';
   document.getElementById('reviewComment').value='';
@@ -2021,7 +2035,7 @@ function renderPRModal(repo,pr,comments){
     <span>by ${esc(pr.user.login)}</span>
     <span>opened ${timeAgo(pr.created_at)}</span>
     <span style="font-family:monospace;font-size:11px">${esc(pr.head.label)} → ${esc(pr.base.label)}</span>
-    ${pr.mergeable===false?`<span style="color:var(--bw-red)">⚠ Merge conflicts</span>`:''}
+    ${pr.mergeable===false?`<span style="color:var(--red)">⚠ Merge conflicts</span>`:''}
   `;
   document.getElementById('prModalBody').innerHTML=`<div class="issue-body">${esc(pr.body||'No description.')}</div>`;
   document.getElementById('prComments').innerHTML=comments.length
